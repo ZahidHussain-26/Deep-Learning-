@@ -1,0 +1,155 @@
+
+
+# Import libraries
+import tensorflow as tf
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.io import loadmat
+from tensorflow.keras.utils import to_categorical
+from sklearn.metrics import classification_report, confusion_matrix
+import seaborn as sns
+
+# Download SVHN dataset (train, test)
+import urllib.request
+
+train_url = "http://ufldl.stanford.edu/housenumbers/train_32x32.mat"
+test_url = "http://ufldl.stanford.edu/housenumbers/test_32x32.mat"
+
+# Download the data
+urllib.request.urlretrieve(train_url, "train_32x32.mat")
+urllib.request.urlretrieve(test_url, "test_32x32.mat")
+
+# Load the dataset
+train_data = loadmat('train_32x32.mat')
+test_data = loadmat('test_32x32.mat')
+
+# Extract images and labels
+X_train = train_data['X']
+y_train = train_data['y']
+X_test = test_data['X']
+y_test = test_data['y']
+
+# Transpose image dimensions to (num_samples, height, width, channels)
+X_train = np.transpose(X_train, (3, 0, 1, 2))
+X_test = np.transpose(X_test, (3, 0, 1, 2))
+
+# Convert labels to one-hot encoded vectors
+y_train[y_train == 10] = 0
+y_test[y_test == 10] = 0
+y_train = to_categorical(y_train, 10)
+y_test = to_categorical(y_test, 10)
+
+# Normalize the pixel values to [0, 1]
+X_train = X_train / 255.0
+X_test = X_test / 255.0
+
+# Apply data augmentation
+from tensorflow.keras.preprocessing.image import ImageDataGenerator
+
+datagen = ImageDataGenerator(
+    rotation_range=10,        # Rotate images up to 10 degrees
+    zoom_range=0.1,           # Apply zoom augmentation
+    horizontal_flip=True,     # Flip the images horizontally
+    width_shift_range=0.1,    # Shift the width slightly
+    height_shift_range=0.1    # Shift the height slightly
+)
+
+# Fit the data generator to the training data
+datagen.fit(X_train)
+
+# Define the CNN model
+model = tf.keras.models.Sequential([
+    tf.keras.layers.Conv2D(32, (3, 3), activation='relu', input_shape=(32, 32, 3)),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+
+    tf.keras.layers.Conv2D(64, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+
+    tf.keras.layers.Conv2D(128, (3, 3), activation='relu'),
+    tf.keras.layers.MaxPooling2D((2, 2)),
+
+    tf.keras.layers.Flatten(),
+    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(10, activation='softmax')  # 10 classes for digit classification
+])
+
+# Compile the model
+model.compile(optimizer='adam',
+              loss='categorical_crossentropy',
+              metrics=['accuracy'])
+
+# Model summary
+model.summary()
+
+# Train the model with augmented data
+history = model.fit(datagen.flow(X_train, y_train, batch_size=64),
+                    epochs=20,
+                    validation_data=(X_test, y_test))
+
+# Plot training and validation accuracy
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.plot(history.history['val_accuracy'], label='val_accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+plt.show()
+
+# Evaluate the model on the test set
+test_loss, test_acc = model.evaluate(X_test, y_test)
+print("Test accuracy:", test_acc)
+
+# Predict test labels
+predictions = model.predict(X_test)
+
+# Classification report
+y_test_labels = np.argmax(y_test, axis=1)
+y_pred_labels = np.argmax(predictions, axis=1)
+print(classification_report(y_test_labels, y_pred_labels))
+
+# Confusion matrix
+conf_matrix = confusion_matrix(y_test_labels, y_pred_labels)
+plt.figure(figsize=(10, 8))
+sns.heatmap(conf_matrix, annot=True, fmt='d', cmap='Blues')
+plt.xlabel('Predicted')
+plt.ylabel('True')
+plt.title('Confusion Matrix')
+plt.show()
+
+# Function to plot a test sample and its predicted label
+def plot_sample(X, y_true, y_pred, index):
+    plt.imshow(X[index])
+    plt.title(f"True: {y_true[index]}, Predicted: {y_pred[index]}")
+    plt.show()
+
+# Display first 5 test samples with their true and predicted labels
+for i in range(5):
+    plot_sample(X_test, y_test_labels, y_pred_labels, i)
+
+import matplotlib.pyplot as plt
+from google.colab import files
+
+# Plot training and validation accuracy
+plt.plot(history.history['accuracy'], label='accuracy')
+plt.plot(history.history['val_accuracy'], label='val_accuracy')
+plt.xlabel('Epochs')
+plt.ylabel('Accuracy')
+plt.legend()
+
+# Save the accuracy curve as an image file
+plt.savefig('accuracy_curve.png')  # Save the plot as a PNG file
+
+# Show the plot
+plt.show()
+
+# Download the saved accuracy curve image file
+files.download('accuracy_curve.png')  # Download the saved image
+
+
+
+
+
+
+
+
+
+
